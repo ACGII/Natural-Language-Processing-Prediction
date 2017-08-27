@@ -1,0 +1,407 @@
+---
+title: "predictTheNext1.4.Rmd"
+author: "ACGII"
+date: "December 5, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE,cache=TRUE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(knitr); library(dplyr)#; library(doParallel)
+library(stringi); library(tm); library(ggplot2); library(wordcloud)
+
+library(quanteda)#;library(markovchain)
+library(msm)
+
+ptm <- proc.time()
+# Google badwords
+bWFP <- c( "../../data/Wk2/badwords1.txt")
+badWords <- iconv(readLines(bWFP, warn = FALSE), "UTF-8", "UTF-8", "byte")
+# Select which partition  
+# I values: 1-training  2-dev training  3-test  4-xtra training
+I=3
+
+pathD<-"C:/Albert/Coursera Data Science/Data Science Capstone/Project/data/Wk4"
+pathBIG<-"C:/Albert/Coursera Data Science/Data Science Capstone/Project/data/Wk5-"
+
+
+BIG<-DirSource(pathBIG, encoding = "UTF-8",pattern ="Full_[butqp]g.csv")
+
+Q0<-'aaa'
+Q00<-'aX'
+
+Q1<-'The guy in front of me just bought a pound of bacon, a bouquet, and a case of'
+
+Q2<-'You are the reason why I smile everyday. Can you follow me please? It would mean the'
+
+Q3<-'Hey sunshine, can you follow me and make me the'
+Q4<-'Very early observations on the Bills game: Offense still struggling but the'
+Q5<-'Go on a romantic date at the'
+Q6<-' Well I am pretty sure my granny has some old bagpipes in her garage I will dust them off and be on my'
+Q7<-'Ohhhhh #PointBreak is on tomorrow. Love that film and haven ot seen it in quite some'
+Q8<-'After the ice bucket challenge Louis will push his long wet hair out of his eyes with his little'
+Q9<-'Be grateful for the good times and keep the faith during the'
+Q10<-'If this is not the cutest thing you have ever seen, then you must be'
+Q11<-'When you breathe, I want to be the air for you. I will be there for you, I would live and I would'
+Q12<-'Guy at my table wife got up to go to the bathroom and I asked about dessert and he started telling me about his'
+Q13<-'I would give anything to see arctic monkeys this'
+Q14<-'Talking to your mom has the same effect as a hug and helps reduce your'
+Q15<-'When you were in Holland you were like 1 inch away from me but you had not time to take a'
+Q16<-'I would just like all of these questions answered, a presentation of evidence, and a jury to settle the'
+Q17<-'I can not deal with unsymetrical things. I can not even hold an uneven number of bags of groceries in each'
+Q18<-'Every inch of you is perfect from the bottom to the'
+Q19<-'I am thankful my childhood was filled with imagination and bruises from playing'
+Q20<-'I like how the same people are in almost all of Adam Sandlers'
+
+QQ<-rbind(Q0,Q00,Q1,Q2,Q3,Q4,Q5,Q6,Q7,Q8,Q9,Q10,
+          Q11,Q12,Q13,Q14,Q15,Q16,Q17,Q18,Q19,Q20)
+
+```                          
+
+```{r methods-functions,echo=FALSE,cache=TRUE}
+
+
+preprocess_data<- function(b){  # INPUT PARAMETER:
+                                    # b data frame
+                                    # RETURN OUTPUT:
+                                    # b-procssed  input data
+  
+# The method, preprocess_data, performs data cleaning and junk removal on the input data frame.  It # # # removes contractions, decimals numbers, upper case, hashtags, profanity and webtalk
+
+# PREPROCESS     
+     
+     b <- gsub("[Cc]an't", "cannot", b, perl=T)
+     b <- gsub("[Ww]on't", "willnot", b, perl=T)
+     b <- gsub("[dd]idn't", "didnot", b, perl=T)
+     b <- gsub("[Ii]sn't", "isnot", b, perl=T)
+     b <- gsub("[Ii]'m", "i am", b, perl=T)
+     b <- gsub("[Ww]hatr'e", "what are", b, perl=T) 
+     b <- gsub("'ll", "will", b, perl=T)
+     b <- gsub("'ve", " have", b, perl=T)
+     b <- gsub("'d", " had", b, perl=T)
+     b <- gsub("'nt", " not", b, perl=T)
+     b <- gsub("'s", " is", b, perl=T)
+       
+     b <- gsub("([0-9]*)\\.([0-9]+)", "\\1 \\2",b, perl=T) #decimals
+     b <- gsub("#[a-zA-z0-9]+", "", b,perl=T) #hashtags
+     b <- gsub("[^\\w\\s]", "", b, perl=T)
+     b <- gsub("[\\d_]", "", b, perl=T)
+          
+          
+     b <- gsub("thx", "thanks", b, perl=T)
+     b <- gsub(" u ", " you ", b, perl=T)
+     b <- gsub(" ur ", " you are ", b, perl=T)
+     b <- gsub("-", " ", b, perl=T)
+     b <- gsub(" am | is | are ", " be ", b, perl=T)
+     b <- gsub("'s|s'", "", b, perl=T)
+     b <- gsub("ful |ic ", " ", b, perl=T)
+     b <- gsub(" rt ", "", b, perl=T)
+     b <- gsub("\\$|\\/|\\@", "", b, perl=T)
+     b <- gsub(" *$", "", b, perl=T) 
+     b <- gsub("^ *", "", b, perl=T)
+
+     b <- tolower(b)
+          
+
+#remove Rows With Bad Words
+     
+     for (j in 1:length(badWords)){
+       zz<-badWords[j]
+       b <- gsub(zz, "", b, perl=T)
+     }
+         
+     b <- gsub(" [^ia ] | ? ", " ", b, perl=T)
+     b
+}
+
+read_input_file<- function(iI){ # INPUT PARAMETERS:
+                                    # iI filename of input data frame
+                                    # RETURN OUTPUT:
+                                    # b-file contents data  
+
+# read in the data file dN
+     b <- iconv(readLines(iI, warn = FALSE), "UTF-8", "UTF-8", "byte")
+     b
+}
+     
+
+write_output_file<- function(o,oO){ # INPUT PARAMETERS:
+                                        # o-output data
+                                        # oO- output filename data frame
+                                        # RETURN OUTPUT:
+                                        # void 
+
+#store samples dNO
+     fileConnection <- file(oO, "w+")
+     writeLines(o, fileConnection)
+     close(fileConnection)
+}
+
+
+display_file_stats<- function(bB,Flag){ # INPUT PARAMETERS:
+                                         # bB- file of data to be analyzed
+                                         # Flag-first entry flag
+                                         # RETURN OUTPUT:
+                                         # string of statitics
+
+
+if(Flag==0)print("THE TRAINING FILE STATISTICS")
+ 
+     
+     b<-read_input_file(bB)
+
+# get the file stats dNO
+     f <- gsub("^.*ModT", "ModT", bB, perl=T)
+     fsize <- file.info(bB)[1]/1024/1024
+     nchars <- lapply(b, nchar)
+     maxchars <- which.max(nchars)
+     nwords <- sum(sapply(strsplit(b, "\\s+"), length))
+     h<-sprintf("%s, SIZE: (%s MB), LINES: (%d), WORDS: (%d), LONGEST LINE: (%d)",f,format(round(fsize, 2), nsmall = 2),length(b),nwords,maxchars)
+     print(h)
+}
+
+
+
+procDfm<- function(cor,n,name) {
+          
+          Qdfm <- dfm(cor, verbose=FALSE,stem=TRUE,ngrams=n)
+          freq <- colSums(Qdfm)
+          freq <- sort(freq, decreasing=TRUE)
+          qfp.df<-data.frame(freq)
+          qfp.df[name] <- rownames(qfp.df)
+          qfp.df
+
+}
+
+
+ procDataG<- function(corp,n) {
+    j<-0
+    q<-data.frame()
+    if(n>4){
+             q<-procDfm(corp,3,"Qgram")
+             j<-4
+             q
+             
+            
+    }
+
+     if(nrow(q)==0 && n>3){
+         q<-procDfm(corp,3,"Tgram")
+          j<-3 
+         if(nrow(q)==0 && n>2){
+              q<-procDfm(corp,2,"Bgram")
+              j<-2
+              if(nrow(q)==0){
+                 q<-procDfm(corp,1,"Ugram")
+                 j<-1
+                # print(u)
+              } else {
+                #print(bb)
+              }
+         }else {
+           #print(t)
+         }
+     } else {
+       #print(q)
+     }
+     ret<-c(q,j)
+     ret
+}
+
+
+UGMatches<-function(d,li){
+     
+          uug<-paste0('^',d)
+          bb<-bg[grep(uug,bg[,2]),]
+          if( length(bb[,3])>0){
+              last<-bb[which(bb[,3]==max(bb[,3])),]
+              lst<-strsplit(as.character(last[,2]), "\\_")
+              #print('LST');print(length(lst[[1]]));print(lst[[1]])
+              if(length(lst[[1]])==2){
+                   li[uug]<-lst[[1]][[2]]
+              } else {
+                li[uug]<-0
+              }
+          }
+        
+     li
+}
+BGMatches<-function(d,li){
+     
+          ttg<-paste0('^',d)
+          bb<-tg[grep(ttg,tg[,2]),]
+  
+          if( length(bb[,3])>0){
+              last<-bb[which(bb[,3]==max(bb[,3])),]
+              lst<-strsplit(as.character(last[,2]), "\\_")
+              #print('LST');print(length(lst[[1]]));print(lst[[1]])
+              if(length(lst[[1]])==3){
+                   li[ttg]<-lst[[1]][[3]]
+              } else{
+                li[ttg]<-0
+              }
+          } else{
+              li[ttg]<-0
+          }
+     li
+}
+QGMatches<-function(d,li){
+     
+          ttg<-paste0('^',d)
+          bb<-pg[grep(ttg,pg[,2]),]
+  
+          if( length(bb[,3])>0){
+              last<-bb[which(bb[,3]==max(bb[,3])),]
+              lst<-strsplit(as.character(last[,2]), "\\_")
+              #print('LST');print(length(lst[[1]]));print(lst[[1]])
+              if(length(lst[[1]])==5){
+                   li[ttg]<-lst[[1]][[5]]
+              } else{
+                li[ttg]<-0
+              }
+          } else { li[ttg]<-0}
+         
+     li
+}
+
+TGMatches<-function(d,li){
+    
+         
+          ttg<-paste0('^',d)
+          bb<-qg[grep(ttg,qg[,2]),] 
+        # print(ttg)
+         #print(bb)
+         #print(length(bb[,3]))
+          if( length(bb[,3])>0){
+              last<-bb[which(bb[,3]==max(bb[,3])),]
+              lst<-strsplit(as.character(last[,2]), "\\_")
+              if(length(lst[[1]])==4){
+                   li[ttg]<-lst[[1]][[4]]
+              } 
+              
+          } else {
+                li[ttg]<-0
+          }
+     
+     li
+}
+
+makeLastNgram<-function(v,num){
+     x<-character()
+     z<-character()
+     N<-length(v[[1]])
+     if(N<num)return (0);
+     if(num==3){
+          z<-paste(v[[1]][[N-2]],v[[1]][[N-1]],v[[1]][[N]],sep='_')
+          x<-paste0(z,'_')
+
+     } else if(num==4){
+          z<-paste(v[[1]][[N-3]],v[[1]][[N-2]],
+                           v[[1]][[N-1]],v[[1]][[N]],sep='_')
+          x<-paste0(z,'_')
+     } else if(num==2){
+           z<-paste(v[[1]][[N-1]],v[[1]][[N]],sep='_')
+           x<-paste0(z,'_')
+     } else if(num == 1){
+           x<-paste0(v[[1]][[N]],'_')
+     }
+     x
+}
+
+getNextW<-function(y){
+       
+      ss <- strsplit(y, "\\s+")
+    
+      qgr<-makeLastNgram(ss,4)
+      qgList<-QGMatches(qgr,qgList)
+      if(qgList[length(qgList)] !=0){
+          #print('Quadgram') 
+          return(qgList[,2])
+      }
+      
+      tgr<-makeLastNgram(ss,3)
+      tgList<-TGMatches(tgr,tgList)
+      if(tgList[length(tgList)]!=0){
+         # print('Trigram')
+          return(tgList[,2])
+      }
+      
+      bgr<-makeLastNgram(ss,2) 
+      bgList<-BGMatches(bgr,bgList)                    
+      if(bgList[length(bgList)]!=0){
+          #print('Bigram') 
+          return(bgList[,2])
+      }
+      
+      ugr<-makeLastNgram(ss,1) 
+      ugList<-UGMatches(ugr,ugList)
+      if(length(ugList)>1){
+           return(ugList[,2])
+      }
+      
+      return('a')
+}
+
+```
+
+## Test Run
+
+
+```{r testDataRun, echo=FALSE,cache=TRUE}
+
+bg<-read.csv(BIG$filelist[1])
+#print('Bigram');head(bg)
+pg<-read.csv(BIG$filelist[2])
+#print('Pentagram');head(pg)
+qg<-read.csv(BIG$filelist[3])
+#print('Quadgram');head(qg)
+tg<-read.csv(BIG$filelist[4])
+#print('Trigram');head(tg)
+ug<-read.csv(BIG$filelist[5])
+#print('Unigram');head(ug)
+
+
+```
+
+```{r testRun, echo=FALSE, cache=TRUE}
+#Q17
+#preprocess_data(paste('XXXXXXXXXXXXXXXXXXXXXXXXXXXXX',Q17))
+
+
+qgList<-matrix(4,nrow=1,ncol=1)
+qgList<-data.frame(qgList)
+tgList<-matrix(3,nrow=1,ncol=1)
+tgList<-data.frame(tgList)
+bgList<-matrix(2,nrow=1,ncol=1)
+bgList<-data.frame(bgList)
+ugList<-matrix(1,nrow=1,ncol=1)
+ugList<-data.frame(ugList)
+
+
+  for(j in 1:length(QQ)){
+    
+     q<-data.frame()
+     x<-character()
+
+     y<-preprocess_data(QQ[j])
+     if(y=="") next
+     
+     print(y)
+     xxx<-getNextW(y)
+     print(xxx)#;print(xxx[,2])}
+     #else print('None')
+     
+     qgList<-matrix(4,nrow=1,ncol=1)
+     qgList<-data.frame(qgList)
+     tgList<-matrix(3,nrow=1,ncol=1)
+     tgList<-data.frame(tgList)
+     bgList<-matrix(2,nrow=1,ncol=1)
+     bgList<-data.frame(bgList)
+     ugList<-matrix(1,nrow=1,ncol=1)
+     ugList<-data.frame(ugList)
+}
+
+```
+
+
