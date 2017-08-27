@@ -1,0 +1,925 @@
+---
+title: "projectRePartiton"
+author: "ACGII"
+date: "October 8, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+
+
+library(knitr); library(dplyr); library(doParallel)
+library(stringi); library(tm); library(ggplot2); library(wordcloud)
+
+library(quanteda);library(markovchain);library(msm)
+
+ptm <- proc.time()
+
+codepath<-"C:/Albert/Coursera Data Science/Data Science Capstone/Project/code/Wk4"
+setwd(codepath)
+
+pathD <- "C:/Albert/Coursera Data Science/Data Science Capstone/Project/data/SwiftKey 1/en_US"
+pathD3 <- "C:/Albert/Coursera Data Science/Data Science Capstone/Project/data/Wk4"
+
+#Training
+bSFP <-c( "C:/Albert/Coursera Data Science/Data Science Capstone/Project/data/Wk3/ModTr.blogs.txt")
+nSFP <- c("C:/Albert/Coursera Data Science/Data Science Capstone/Project/data/Wk3/ModTr.news.txt")
+tSFP <- c("C:/Albert/Coursera Data Science/Data Science Capstone/Project/data/Wk3/ModTr.twitter.txt")
+
+#Development Test
+bDFP <-c( "C:/Albert/Coursera Data Science/Data Science Capstone/Project/data/Wk3/ModTDev.blogs.txt")
+nDFP <- c("C:/Albert/Coursera Data Science/Data Science Capstone/Project/data/Wk3/ModTDev.news.txt")
+tDFP <- c("C:/Albert/Coursera Data Science/Data Science Capstone/Project/data/Wk3/ModTDev.twitter.txt")
+
+#Test
+bTFP <-c( "C:/Albert/Coursera Data Science/Data Science Capstone/Project/data/Wk3/ModTs.blogs.txt")
+nTFP <- c("C:/Albert/Coursera Data Science/Data Science Capstone/Project/data/Wk3/ModTs.news.txt")
+tTFP <- c("C:/Albert/Coursera Data Science/Data Science Capstone/Project/data/Wk3/ModTs.twitter.txt")
+
+# Xtra training
+bXFP <-c( "C:/Albert/Coursera Data Science/Data Science Capstone/Project/data/Wk3/ModTx.blogs.txt")
+nXFP <- c("C:/Albert/Coursera Data Science/Data Science Capstone/Project/data/Wk3/ModTx.news.txt")
+tXFP <- c("C:/Albert/Coursera Data Science/Data Science Capstone/Project/data/Wk3/ModTx.twitter.txt")
+
+# Training Output
+bSFO <-c( "C:/Albert/Coursera Data Science/Data Science Capstone/Project/data/Wk4/ModTrO.blogs.txt")
+nSFO <- c("C:/Albert/Coursera Data Science/Data Science Capstone/Project/data/Wk4/ModTrO.news.txt")
+tSFO<- c("C:/Albert/Coursera Data Science/Data Science Capstone/Project/data/Wk4/ModTrO.twitter.txt")
+# DEV Training Output
+bDFO <-c( "C:/Albert/Coursera Data Science/Data Science Capstone/Project/data/Wk4/ModTDevO.blogs.txt")
+nDFO <- c("C:/Albert/Coursera Data Science/Data Science Capstone/Project/data/Wk4/ModTDevO.news.txt")
+tDFO <- c("C:/Albert/Coursera Data Science/Data Science Capstone/Project/data/Wk4/ModTDevO.twitter.txt")
+
+# Xtra training Ouput
+bXFO <-c( "C:/Albert/Coursera Data Science/Data Science Capstone/Project/data/Wk4/ModTxO.blogs.txt")
+nXFO <- c("C:/Albert/Coursera Data Science/Data Science Capstone/Project/data/Wk4/ModTxO.news.txt")
+tXFO <- c("C:/Albert/Coursera Data Science/Data Science Capstone/Project/data/Wk4/ModTxO.twitter.txt")
+
+# Test Output
+bTFO <-c( "C:/Albert/Coursera Data Science/Data Science Capstone/Project/data/Wk4/ModTsO.blogs.txt")
+nTFO <- c("C:/Albert/Coursera Data Science/Data Science Capstone/Project/data/Wk4/ModTsO.news.txt")
+tTFO <- c("C:/Albert/Coursera Data Science/Data Science Capstone/Project/data/Wk4/ModTsO.twitter.txt")
+
+# N-GRAM Output
+cUNI <- c("C:/Albert/Coursera Data Science/Data Science Capstone/Project/data/Wk4/ModTrO.unigram.csv")
+cBIG <- c("C:/Albert/Coursera Data Science/Data Science Capstone/Project/data/Wk4/ModTrO.bigram.csv")
+cTRI <- c("C:/Albert/Coursera Data Science/Data Science Capstone/Project/data/Wk4/ModTrO.trigram.csv")
+cQUA<- c("C:/Albert/Coursera Data Science/Data Science Capstone/Project/data/Wk4/ModTrO.quadgram.csv")
+cPEN<- c("C:/Albert/Coursera Data Science/Data Science Capstone/Project/data/Wk4/ModTrO.pentagram.csv")
+cVOC<- c("C:/Albert/Coursera Data Science/Data Science Capstone/Project/data/Wk4/ModTrO.Vocab.csv")
+
+
+
+cUNId <- c("C:/Albert/Coursera Data Science/Data Science Capstone/Project/data/Wk4/ModTdO.unigram.csv")
+cBIGd <- c("C:/Albert/Coursera Data Science/Data Science Capstone/Project/data/Wk4/ModTdO.bigram.csv")
+cTRId <- c("C:/Albert/Coursera Data Science/Data Science Capstone/Project/data/Wk4/ModTdO.trigram.csv")
+cQUAd <- c("C:/Albert/Coursera Data Science/Data Science Capstone/Project/data/Wk4/ModTdO.quadgram.csv")
+cPENd <- c("C:/Albert/Coursera Data Science/Data Science Capstone/Project/data/Wk4/ModTdO.pentagram.csv")
+cVOCd<- c("C:/Albert/Coursera Data Science/Data Science Capstone/Project/data/Wk4/ModTdO.Vocab.csv")
+
+
+cUNIs <- c("C:/Albert/Coursera Data Science/Data Science Capstone/Project/data/Wk4/ModTsO.unigram.csv")
+cBIGs <- c("C:/Albert/Coursera Data Science/Data Science Capstone/Project/data/Wk4/ModTsO.bigram.csv")
+cTRIs <- c("C:/Albert/Coursera Data Science/Data Science Capstone/Project/data/Wk4/ModTsO.trigram.csv")
+cQUAs <- c("C:/Albert/Coursera Data Science/Data Science Capstone/Project/data/Wk4/ModTsO.quadgram.csv")
+cPENs <- c("C:/Albert/Coursera Data Science/Data Science Capstone/Project/data/Wk4/ModTsO.pentagram.csv")
+cVOCs<- c("C:/Albert/Coursera Data Science/Data Science Capstone/Project/data/Wk4/ModTsO.Vocab.csv")
+
+cUNIx <- c("C:/Albert/Coursera Data Science/Data Science Capstone/Project/data/Wk4/ModTxO.unigram.csv")
+cBIGx <- c("C:/Albert/Coursera Data Science/Data Science Capstone/Project/data/Wk4/ModTxO.bigram.csv")
+cTRIx <- c("C:/Albert/Coursera Data Science/Data Science Capstone/Project/data/Wk4/ModTxO.trigram.csv")
+cQUAx <- c("C:/Albert/Coursera Data Science/Data Science Capstone/Project/data/Wk4/ModTxO.quadgram.csv")
+cPENx <- c("C:/Albert/Coursera Data Science/Data Science Capstone/Project/data/Wk4/ModTxO.pentagram.csv")
+cVOCx<- c("C:/Albert/Coursera Data Science/Data Science Capstone/Project/data/Wk4/ModTxO.Vocab.csv")
+
+# N-GRAM frequency of frequencies 
+cUFF <- c("C:/Albert/Coursera Data Science/Data Science Capstone/Project/data/Wk4/ModTrO.unigramFF.csv")
+cBFF <- c("C:/Albert/Coursera Data Science/Data Science Capstone/Project/data/Wk4/ModTrO.bigramFF.csv")
+cTFF <- c("C:/Albert/Coursera Data Science/Data Science Capstone/Project/data/Wk4/ModTrO.trigramFF.csv")
+cQFF <- c("C:/Albert/Coursera Data Science/Data Science Capstone/Project/data/Wk4/ModTrO.qgramFF.csv")
+
+
+cUFFd <- c("C:/Albert/Coursera Data Science/Data Science Capstone/Project/data/Wk4/ModTdO.unigramFF.csv")
+cBFFd <- c("C:/Albert/Coursera Data Science/Data Science Capstone/Project/data/Wk4/ModTdO.bigramFF.csv")
+cTFFd <- c("C:/Albert/Coursera Data Science/Data Science Capstone/Project/data/Wk4/ModTdO.trigramFF.csv")
+cQFFd <- c("C:/Albert/Coursera Data Science/Data Science Capstone/Project/data/Wk4/ModTdO.quadgramFF.csv")
+
+cUFFs <- c("C:/Albert/Coursera Data Science/Data Science Capstone/Project/data/Wk4/ModTsO.unigramFF.csv")
+cBFFs <- c("C:/Albert/Coursera Data Science/Data Science Capstone/Project/data/Wk4/ModTsO.bigramFF.csv")
+cTFFs <- c("C:/Albert/Coursera Data Science/Data Science Capstone/Project/data/Wk4/ModTsO.trigramFF.csv")
+cQFFs <- c("C:/Albert/Coursera Data Science/Data Science Capstone/Project/data/Wk4/ModTsO.quadgramFF.csv")
+
+cUFFx <- c("C:/Albert/Coursera Data Science/Data Science Capstone/Project/data/Wk4/ModTxO.unigramFF.csv")
+cBFFx <- c("C:/Albert/Coursera Data Science/Data Science Capstone/Project/data/Wk4/ModTxO.bigramFF.csv")
+cTFFx <- c("C:/Albert/Coursera Data Science/Data Science Capstone/Project/data/Wk4/ModTxO.trigramFF.csv")
+cQFFx <- c("C:/Albert/Coursera Data Science/Data Science Capstone/Project/data/Wk4/ModTxO.quadgramFF.csv")
+
+blog<-character()
+news<-character()
+twitter<-character()
+Rprof()
+dN<-rbind(c(bSFP,bDFP,bTFP,bXFP),c(nSFP,nDFP,nTFP,nXFP),c(tSFP,tDFP,tTFP,tXFP))
+dNO<-rbind(c(bSFO,bDFO,bTFO,bXFO),c(nSFO,nDFO,nTFO,nXFO),c(tSFO,tDFO,tTFO,tXFO))
+
+
+
+dNOng<-rbind(c(cUNI,cBIG,cTRI,cQUA,cPEN,cVOC),c(cUNId,cBIGd,cTRId,cQUAd,cPENd,cVOCd),c(cUNIs,cBIGs,cTRIs,cQUAs,cPENs,cVOCs),c(cUNIx,cBIGx,cTRIx,cQUAx,cPENx,cVOCx))
+dNOff<-rbind(c(cUFF,cBFF,cTFF,cQFF),c(cUFFd,cBFFd,cTFFd,cQFFd),c(cUFFs,cBFFs,cTFFs,cQFFs),c(cUFFx,cBFFx,cTFFx,cQFFx))
+
+# Select which partition  
+# I values: 1-training  2-dev training  3-test  4-xtra training
+I=4
+
+
+```{r methods-functions chunk,echo=FALSE,cache=TRUE}
+unique_words<- function(x,y){ # x = dfm y= percent of dictionary
+  Sum=0
+  for(i in 1:length(x)){
+       Sum<-Sum + s[i]/sum(s)
+       if(Sum > y){
+            break 
+      }
+  }
+  i
+}
+
+# Get frequency of individual frequencies
+freqFreq<- function(x){ # x = data frame with word frequecies
+     k=1
+     f<-numeric()
+     ff<-numeric()
+     FF <- matrix(0, nrow = length(unique(x[,2])), ncol = 2)
+     FF <-data.frame(FF)
+     for(i in c(unique(x[,2]))){
+         y<-x[x[,2]==i,]
+         z<-nrow(y)
+         f[k]<-i
+         ff[k]<-z
+         k = k + 1
+     }
+     FF['X1']<-f
+     FF['X2']<-ff
+     colnames(FF)<-c('Frequency','Occurance') 
+     FF
+}
+
+
+preprocess_data<- function(b){  # INPUT PARAMETER:
+                                    # b data frame
+                                    # RETURN OUTPUT:
+                                    # b-procssed  input data
+  
+# The method, preprocess_data, performs data cleaning and junk removal on the input data frame.  It # # # removes contractions, decimals numbers, upper case, hashtags, profanity and webtalk
+
+# PREPROCESS     
+     
+     b <- gsub("[Cc]an't", "cannot", b, perl=T)
+     b <- gsub("[Ww]on't", "willnot", b, perl=T)
+     b <- gsub("[dd]idn't", "didnot", b, perl=T)
+     b <- gsub("[Ii]sn't", "isnot", b, perl=T)
+     b <- gsub("[Ii]'m", "i am", b, perl=T)
+     b <- gsub("[Ww]hatr'e", "what are", b, perl=T) 
+     b <- gsub("'ll", "will", b, perl=T)
+     b <- gsub("'ve", " have", b, perl=T)
+     b <- gsub("'d", " had", b, perl=T)
+     b <- gsub("'nt", " not", b, perl=T)
+     b <- gsub("'s", " is", b, perl=T)
+       
+     b <- gsub("([0-9]*)\\.([0-9]+)", "\\1 \\2",b, perl=T) #decimals
+     b <- gsub("#[a-zA-z0-9]+", "", b,perl=T) #hashtags
+     b <- gsub("[^\\w\\s]", "", b, perl=T)
+     b <- gsub("[\\d_]", "", b, perl=T)
+          
+          
+     b <- gsub("thx", "thanks", b, perl=T)
+     b <- gsub(" u ", " you ", b, perl=T)
+     b <- gsub(" ur ", " you are ", b, perl=T)
+     b <- gsub("-", " ", b, perl=T)
+     b <- gsub(" am | is | are ", " be ", b, perl=T)
+     b <- gsub("'s|s'", "", b, perl=T)
+     b <- gsub("ful |ic ", " ", b, perl=T)
+     b <- gsub(" rt ", "", b, perl=T)
+     b <- gsub("\\$|\\/|\\@", "", b, perl=T)
+     b <- gsub(" *$", "", b, perl=T) 
+     b <- gsub("^ *", "", b, perl=T)
+
+     b <- tolower(b)
+          
+
+#remove Rows With Bad Words
+     
+     for (j in 1:length(badWords)){
+       zz<-badWords[j]
+       b <- gsub(zz, "", b, perl=T)
+     }
+         
+     b <- gsub(" [^ia ] | ? ", " ", b, perl=T)
+     b
+}
+
+
+Preprocess_data<- function(b){  # INPUT PARAMETER:
+                                    # b data frame
+                                    # RETURN OUTPUT:
+                                    # b-procssed  input data
+  
+# The method, preprocess_data, performs data cleaning and junk removal on the input data frame.  It # # # removes contractions, decimals numbers, upper case, hashtags, profanity and webtalk
+
+# PREPROCESS     
+     
+     b <- gsub("[Cc]an't", "cannot", b, perl=T)
+     b <- gsub("[Ww]on't", "willnot", b, perl=T)
+     b <- gsub("[dd]idn't", "didnot", b, perl=T)
+     b <- gsub("[Ii]sn't", "isnot", b, perl=T)
+     b <- gsub("[Ii]'m", "i am", b, perl=T)
+     b <- gsub("[Ww]hatr'e", "what are", b, perl=T) 
+     b <- gsub("'ll", "will", b, perl=T)
+     b <- gsub("'ve", " have", b, perl=T)
+     b <- gsub("'d", " had", b, perl=T)
+     b <- gsub("'nt", " not", b, perl=T)
+     b <- gsub("'s", " is", b, perl=T)
+       
+     b <- gsub("([0-9]*)\\.([0-9]+)", "\\1 \\2",b, perl=T) #decimals
+     b <- gsub("#[a-zA-z0-9]+", "", b,perl=T) #hashtags
+     b <- gsub("[^\\w\\s]", "", b, perl=T)
+     b <- gsub("[\\d_]", "", b, perl=T)
+          
+          
+     b <- gsub("thx", "thanks", b, perl=T)
+     b <- gsub(" u ", " you ", b, perl=T)
+     b <- gsub(" ur ", " you are ", b, perl=T)
+     b <- gsub("-", " ", b, perl=T)
+     b <- gsub(" am | is | are ", " be ", b, perl=T)
+     b <- gsub("'s|s'", "", b, perl=T)
+     b <- gsub("ful |ic ", " ", b, perl=T)
+     b <- gsub(" rt ", "", b, perl=T)
+     b <- gsub("\\$|\\/|\\@", "", b, perl=T)
+
+     b <- tolower(b)
+          
+
+#remove Rows With Bad Words
+     
+     for (j in 1:length(badWords)){
+       zz<-badWords[j]
+       b <- gsub(zz, "", b, perl=T)
+     }
+         
+     b <- gsub(" [^ia ] | ? ", " ", b, perl=T)
+     b
+}
+
+read_input_file<- function(iI){ # INPUT PARAMETERS:
+                                    # iI filename of input data frame
+                                    # RETURN OUTPUT:
+                                    # b-file contents data  
+
+# read in the data file dN
+     b <- iconv(readLines(iI, warn = FALSE), "UTF-8", "UTF-8", "byte")
+     b
+}
+     
+
+write_output_file<- function(o,oO){ # INPUT PARAMETERS:
+                                        # o-output data
+                                        # oO- output filename data frame
+                                        # RETURN OUTPUT:
+                                        # void 
+
+#store samples dNO
+     fileConnection <- file(oO, "w+")
+     writeLines(o, fileConnection)
+     close(fileConnection)
+}
+
+
+display_file_stats<- function(bB,Flag){ # INPUT PARAMETERS:
+                                         # bB- file of data to be analyzed
+                                         # Flag-first entry flag
+                                         # RETURN OUTPUT:
+                                         # string of statitics
+
+
+if(Flag==0)print("THE TRAINING FILE STATISTICS")
+ 
+     
+     b<-read_input_file(bB)
+
+# get the file stats dNO
+     f <- gsub("^.*ModT", "ModT", bB, perl=T)
+     fsize <- file.info(bB)[1]/1024/1024
+     nchars <- lapply(b, nchar)
+     maxchars <- which.max(nchars)
+     nwords <- sum(sapply(strsplit(b, "\\s+"), length))
+     h<-sprintf("%s, SIZE: (%s MB), LINES: (%d), WORDS: (%d), LONGEST LINE: (%d)",f,format(round(fsize, 2), nsmall = 2),length(b),nwords,maxchars)
+     print(h)
+}
+
+library(tm) # Use tm package
+
+partition<-function(){ #INPUTS: void
+                       #   OUTPUT: void
+
+#This function partitions the original data files, blogs, news, and twitter, into four subsets:
+#                      training -
+#                      DevTraining -
+#                      Test
+#                      Extra Training
+# Each of these subsets is a subgrou of three files containing data from the original blogs, new and 
+# twitter files.  The partitiong algorithm uses statisitcal sampling to separate segments.  This 
+# method is rhapsody  that runs end to end.
+                       
+                       
+
+
+    tweet <- VCorpus(DirSource(pathD, encoding = "UTF-8",pattern = "en_US.twitter.*"), 
+                 readerControl=list(language="en"))
+    blog <- VCorpus(DirSource(pathD, encoding = "UTF-8",pattern = "en_US.blogs.*"),
+                readerControl=list(language="en"))
+    news <- VCorpus(DirSource(pathD, encoding = "UTF-8",pattern = "en_US.news.*"),
+                readerControl=list(language="en"))
+
+
+# Permute entire tweet group to randomized order
+    set.seed(11149)
+    perm.tweet <- sample(tweet[[1]][[1]], length(tweet[[1]][[1]]))
+# sets the ratio of training set at 25%
+    TR <- round(0.25*length(perm.tweet))
+    twtTrain <- perm.tweet[1:TR]
+    remain<-perm.tweet[-(1:TR)]
+# splits remaining dataset in half for devtest and test set
+    DEV <- round(0.333*(length(remain)))
+    twtDevtest <- remain[1:DEV]
+    remain<- remain[-(1:DEV)]
+    TST<-round(0.5*(length(remain)))
+    twtTest <- remain[-(1:TST)]
+    twtXtr<-remain[1:TST]
+    write(twtXtr,tXFP)
+    write(twtTrain,tSFP)
+    write(twtDevtest,tDFP)
+    write(twtTest,tTFP)  
+
+    options(warn=-1)
+    rm(twtXFP,twtTrain,twtDevtest,twtTest)
+    options(warn=0)
+# Permute entire blog group to randomized order
+                     
+    set.seed(11149)
+    perm.blog <- sample(blog[[1]][[1]], length(blog[[1]][[1]]))
+# sets the ratio of training set at 25%
+    TR <- round(0.25*length(perm.blog))
+    blogTrain <- perm.blog[1:TR]
+    remain<-perm.blog[-(1:TR)]
+# splits remaining dataset in half for devtest and test set
+    DEV <- round(0.333*(length(remain)))
+    blogDevtest <- remain[1:DEV]
+    remain<- remain[-(1:DEV)]
+    TST<-round(0.5*(length(remain)))
+    blogTest <- remain[-(1:TST)]
+    blogXtr<-remain[1:TST]
+    write(blogXtr,bXFP)
+    write(blogTrain,bSFP)
+    write(blogDevtest,bDFP)
+    write(blogTest,bTFP)
+    options(warn=-1)
+    rm(blogXFP,blogTrain,blogDevtest,blogTest)
+    options(warn=0)
+
+# Permute entire news group to randomized order   
+    set.seed(11149)
+    perm.news <- sample(news[[1]][[1]], length(news[[1]][[1]]))
+# sets the ratio of training set at 25%
+    TR <- round(0.25*length(perm.news))
+    newsTrain <- perm.news[1:TR]
+    remain<-perm.news[-(1:TR)]
+# splits remaining dataset in half for devtest and test set
+    DEV <- round(0.333*(length(remain)))
+    newsDevtest <- remain[1:DEV]
+    remain<- remain[-(1:DEV)]
+    TST<-round(0.5*(length(remain)))
+    newsTest <- remain[-(1:TST)]
+    newsXtr<-remain[1:TST]
+    write(newsXtr,nXFP)
+    write(newsTrain,nSFP)
+    write(newsDevtest,nDFP)
+    write(newsTest,nTFP)
+    options(warn=-1)
+    rm(newsXFP,newsTrain,newsDevtest,newsTest)
+    options(warn=0)
+}
+
+process_unigram<-function(){#INPUTS:  none
+                            #OUTPUT vocab table
+
+    u.freq <- colSums(DLCdfm)
+    u.freq <- sort(u.freq, decreasing=TRUE)
+    uf.df<-data.frame(u.freq)
+    uf.df["unigram"] <- rownames(uf.df)
+    x<-matrix(0,nrow=2,ncol=2)
+    colnames(x)<-c("u.freq","unigram")
+    x<-data.frame(x)
+    x[1,]<-c(1,'UK1')
+    x[2,]<-c(1,'UK2')
+    rownames(x)<-c('UK1','UK2')
+    x[,1]<-as.integer(x[,1])
+    uf.df<-rbind(uf.df,x)
+    us<-sum(uf.df$u.freq)
+    us
+    uf.df["prob"]<- as.numeric(uf.df[,1])/us
+    uf.df["log(prob)"]<- as.numeric(log(uf.df[,3]))
+    write.csv(uf.df,dNOng[I,1])
+    uff<-read.csv(dNOng[I,1])
+    ufff<-freqFreq(uff)  # freq of the freq
+    write.csv(ufff,dNOff[I,1])
+
+    bu.freq <- colSums(Blogdfm)
+    bu.freq <- sort(bu.freq, decreasing=TRUE)
+    buf.df<-data.frame(bu.freq)
+    buf.df["unigram"] <- rownames(buf.df)
+    bus<-sum(buf.df$bu.freq)
+    bus
+    buf.df["prob"]<- as.numeric(buf.df[,1])/bus
+    buf.df["log(prob)"]<- as.numeric(log(buf.df[,3]))
+
+    nu.freq <- colSums(Newsdfm)
+    nu.freq <- sort(nu.freq, decreasing=TRUE)
+    nuf.df<-data.frame(nu.freq)
+    nuf.df["unigram"] <- rownames(nuf.df)
+    nus<-sum(nuf.df$nu.freq)
+    nus
+    nuf.df["prob"]<- as.numeric(nuf.df[,1])/nus
+    nuf.df["log(prob)"]<- as.numeric(log(nuf.df[,3]))
+
+    tu.freq <- colSums(Twitdfm)
+    tu.freq <- sort(tu.freq, decreasing=TRUE)
+    tuf.df<-data.frame(tu.freq)
+    tuf.df["unigram"] <- rownames(tuf.df)
+    tus<-sum(tuf.df$tu.freq)
+    tus
+    tuf.df["prob"]<- as.numeric(tuf.df[,1])/tus
+    tuf.df["log(prob)"]<- as.numeric(log(tuf.df[,3]))
+
+    print("Twitter")
+    h<-head(tuf.df,3);v<-nrow(tuf.df)
+    print(h);print(v)
+    print("Blog")
+    h<-head(buf.df,3);v<-nrow(buf.df)
+    print(h);print(v)
+    print("News")
+    h<-head(nuf.df,3);v<-nrow(nuf.df)
+    print(h);print(v)
+    print("Total")
+    h<-head(uf.df,3);t<-tail(uf.df,3);v<-nrow(uf.df)
+    print(h);print(t);print(v)
+    print("Unigram Frequency of Frequencies")
+    h<-head(ufff,3);t<-tail(ufff,3);v<-nrow(ufff)
+    print(h);print(t);print(v)
+    
+    Src<-character()
+    Doc<-numeric()
+    Voc<-numeric()
+    WT<-numeric()
+    TTR<-numeric()
+    Div<-numeric()
+    Z<-nrow(dN)+1
+
+    for(j in 1:Z) {
+
+         if(j==1) {f<-blog;len<-nrow(buf.df)}
+         if(j==2) {f<-news;len<-nrow(nuf.df)}
+         if(j==3) {f<-twitter;len<-nrow(tuf.df)}
+         if(j==4) {f<-total;len<-nrow(uf.df)}
+         if( j < 4) fn <- gsub("^.*ModT.", "", dN[j,I], perl=T)
+         else fn<-"total"
+  
+         nchars <- lapply(f, nchar)
+         maxchars <- which.max(nchars)
+         nwords <- sum(sapply(strsplit(f, "\\s+"), length))
+     
+         Src[j]<-fn
+         Doc[j]<-length(f)
+         Voc[j]<-nwords
+         WT[j]<-len
+         TTR[j]<-len/nwords
+         Div[j]<-len/(sqrt(2*nwords))
+     
+    }
+    TTR<-round(TTR,3)
+    Div<-round(Div,3)
+    Sourc<-rbind(Src,Doc,Voc,WT,TTR,Div)
+    rownames(Sourc)<-c('Source','Documents','Vocabulary(V)','Word Types (T)','TTR (T/V)','Diversity')
+    colnames(Sourc)<-Sourc[1,]
+    #print("Training Word Analysis")
+    #print(Sourc[-c(1),])
+    options(warn=-1)
+    rm(blog,twitter,news,tweet)
+    Sourc
+
+}
+
+process_bigram<-function() {
+    options(warn=-1)
+    rm(Blogdfm,Twitdfm,Newsdfm,mergedData)
+    rm(blog,twitter,news,SData)
+    rm(b,tweet)
+    rm(blogTrain,blogDevtest,blogTest)
+    rm(twtTrain,twtDevtest,twtTest)
+    rm(newsTrain,newsDevtest,newsTest)
+    options(warn=0)
+
+    bigram.frequency <- colSums(dfm.bigram)
+    bigram.frequency <- sort(bigram.frequency, decreasing=TRUE)
+    bfp.df<-data.frame(bigram.frequency)
+    bfp.df["bigram"] <- rownames(bfp.df)
+    x<-matrix(0,nrow=2,ncol=2)
+    colnames(x)<-c("bigram.frequency","bigram")
+    x<-data.frame(x)
+    x[1,]<-c(1,'UK1')
+    x[2,]<-c(1,'UK2')
+    rownames(x)<-c('UK1','UK2')
+    x[,1]<-as.integer(x[,1])
+    bfp.df<-rbind(bfp.df,x)
+
+    nrow(bfp.df)
+    bis<-sum(bfp.df$bigram.frequency)
+    bis
+    bfp.df["prob"]<- as.numeric(bfp.df[,1])/bis
+    bfp.df["log(prob)"]<- as.numeric(log(bfp.df[,3]))
+    write.csv(bfp.df,dNOng[I,2])
+    bfpf<-read.csv(dNOng[I,2])
+    bfpff<-freqFreq(bfpf)  # freq of the freq
+    write.csv(bfpff,dNOff[I,2])
+
+    print("Bigram Frequecies")
+    h<-head(bfp.df,3);v<-tail(bfp.df,3)
+    print(h);print(v)
+    print("Bigram frequency of Frequencies")
+    h<-head(bfpff,3);v<-tail(bfpff,3)
+    print(h);print(v)
+}
+
+process_trigram<- function(){
+
+    options(warn=-1) 
+    rm(Blogdfm,Twitdfm,Newsdfm,mergedData)
+    rm(b,tweet)
+    rm(blogTrain,blogDevtest,blogTest)
+    rm(twtTrain,twtDevtest,twtTest)
+    rm(newsTrain,newsDevtest,newsTest)
+    rm(uf.df,buf.df,tuf.df,nuf.df,bfp.df,dfm.bigram)
+    options(warn=0)
+
+    trgram.frequency <- colSums(dfm.trigram)
+    trgram.frequency <- sort(trgram.frequency, decreasing=TRUE)
+    tfp.df<-data.frame(trgram.frequency)
+    tfp.df["trigram"] <- rownames(tfp.df)
+    x<-matrix(0,nrow=2,ncol=2)
+    colnames(x)<-c("trgram.frequency","trigram")
+    x<-data.frame(x)
+    x[1,]<-c(1,'UK1')
+    x[2,]<-c(1,'UK2')
+    rownames(x)<-c('UK1','UK2')
+    x[,1]<-as.integer(x[,1])
+    tfp.df<-rbind(tfp.df,x)
+    nrow(tfp.df)
+    trs<-sum(tfp.df$trgram.frequency)
+    trs
+    tfp.df["prob"]<- as.numeric(tfp.df[,1])/trs
+    tfp.df["log(prob)"]<- as.numeric(log(tfp.df[,3]))
+    write.csv(tfp.df,dNOng[I,3])
+    tfpf<-read.csv(dNOng[I,3])
+    tfpff<-freqFreq(tfpf)
+    write.csv(tfpff,dNOff[I,3]) 
+   
+    h<-head(tfp.df,3);v<-tail(tfp.df,3)
+    print("Trigram Frequencies")
+    print(h);print(v)
+    h<-head(tfpff,3);v<-tail(tfpff,3)
+    print("Trigram Frequecy of Frequencies")
+    print(h);print(v)
+
+
+}
+
+
+process_quadgram<- function() {
+
+    quadgram.frequency <- colSums(dfm.quadgram)
+    quadgram.frequency <- sort(quadgram.frequency, decreasing=TRUE)
+    qfp.df<-data.frame(quadgram.frequency)
+    qfp.df["quadgram"] <- rownames(qfp.df)
+    x<-matrix(0,nrow=2,ncol=2)
+    colnames(x)<-c("quadgram.frequency","quadgram")
+    x<-data.frame(x)
+    x[1,]<-c(1,'UK1')
+    x[2,]<-c(1,'UK2')
+    rownames(x)<-c('UK1','UK2')
+    x[,1]<-as.integer(x[,1])
+    qfp.df<-rbind(qfp.df,x)
+
+    nrow(qfp.df)
+    ncol(qfp.df)
+    qrs<-sum(qfp.df$quadgram.frequency)
+    qrs
+    qfp.df["prob"]<- as.numeric(qfp.df[,1])/qrs
+    qfp.df["log(prob)"]<- as.numeric(log(qfp.df[,3]))
+    write.csv(qfp.df,dNOng[I,4])
+    qfpf<-read.csv(dNOng[I,4])
+    qfpff<-freqFreq(qfpf)
+    write.csv(qfpff,dNOff[I,4])
+
+    h<-head(qfp.df,3);v<-tail(qfp.df,3)
+    print("Quadgram Frequencies")
+    print(h);print(v)
+    h<-head(qfpff,3);v<-tail(qfpff,3)
+    print("Quadgram Frequency of Frequencies")
+    print(h);print(v)
+
+}
+
+process_ug<-function(u,i){#INPUTS:  none
+                            #OUTPUT vocab table
+
+    u.freq <- colSums(u)
+    u.freq <- sort(u.freq, decreasing=TRUE)
+    uf.df<-data.frame(u.freq)
+    uf.df["unigram"] <- rownames(uf.df)
+    x<-matrix(0,nrow=2,ncol=2)
+    colnames(x)<-c("u.freq","unigram")
+    x<-data.frame(x)
+    x[1,]<-c(1,'UK1')
+    x[2,]<-c(1,'UK2')
+    rownames(x)<-c('UK1','UK2')
+  
+  x[,1]<-as.integer(x[,1])
+    uf.df<-rbind(uf.df,x) 
+    us<-sum(uf.df$u.freq)
+    us
+    uf.df["prob"]<- as.numeric(uf.df[,1])/us
+    uf.df["log(prob)"]<- as.numeric(log(uf.df[,3]))
+    z<-strsplit(dNOng[I,1],split="unigram")
+    Z<-paste0(z[[1]][[1]],'unigram',as.character(i),z[[1]][[2]])
+    write.csv(uf.df,Z)
+    uff<-read.csv(Z)
+    ufff<-freqFreq(uff)  # freq of the freq
+    z<-strsplit(dNOff[I,1],split="unigram")
+    Z<-paste0(z[[1]][[1]],'unigram',as.character(i),z[[1]][[2]])
+    write.csv(ufff,Z)
+
+}
+
+process_bg<-function(bdfm,i) {
+    
+
+    bigram.frequency <- colSums(bdfm)
+    bigram.frequency <- sort(bigram.frequency, decreasing=TRUE)
+    bfp.df<-data.frame(bigram.frequency)
+    bfp.df["bigram"] <- rownames(bfp.df)
+    x<-matrix(0,nrow=2,ncol=2)
+    colnames(x)<-c("bigram.frequency","bigram")
+    x<-data.frame(x)
+    x[1,]<-c(1,'UK1')
+    x[2,]<-c(1,'UK2')
+    rownames(x)<-c('UK1','UK2')
+    x[,1]<-as.integer(x[,1])
+    bfp.df<-rbind(bfp.df,x)
+
+    nrow(bfp.df)
+    bis<-sum(bfp.df$bigram.frequency)
+    bis
+    bfp.df["prob"]<- as.numeric(bfp.df[,1])/bis
+    bfp.df["log(prob)"]<- as.numeric(log(bfp.df[,3]))
+    z<-strsplit(dNOng[I,2],split="bigram")
+    Z<-paste0(z[[1]][[1]],'bigram',as.character(i),z[[1]][[2]])
+    write.csv(bfp.df,Z)   
+    bfpf<-read.csv(Z)
+    bfpff<-freqFreq(bfpf)  # freq of the freq
+    z<-strsplit(dNOff[I,2],split="bigram")
+    Z<-paste0(z[[1]][[1]],'bigram',as.character(i),z[[1]][[2]])
+    write.csv(bfpff,Z)
+
+    print("Bigram Frequecies")
+    h<-head(bfp.df,3);v<-tail(bfp.df,3)
+    print(h);print(v)
+    print("Bigram frequency of Frequencies")
+    h<-head(bfpff,3);v<-tail(bfpff,3)
+    print(h);print(v)
+}
+
+process_tg<- function(tdfm,i){
+
+    trgram.frequency <- colSums(tdfm)
+    trgram.frequency <- sort(trgram.frequency, decreasing=TRUE)
+    tfp.df<-data.frame(trgram.frequency)
+    tfp.df["trigram"] <- rownames(tfp.df)
+    x<-matrix(0,nrow=2,ncol=2)
+    colnames(x)<-c("trgram.frequency","trigram")
+    x<-data.frame(x)
+    x[1,]<-c(1,'UK1')
+    x[2,]<-c(1,'UK2')
+    rownames(x)<-c('UK1','UK2')
+    x[,1]<-as.integer(x[,1])
+    tfp.df<-rbind(tfp.df,x)
+    nrow(tfp.df)
+    trs<-sum(tfp.df$trgram.frequency)
+    trs
+    tfp.df["prob"]<- as.numeric(tfp.df[,1])/trs
+    tfp.df["log(prob)"]<- as.numeric(log(tfp.df[,3]))
+    z<-strsplit(dNOng[I,3],split="trigram")
+    Z<-paste0(z[[1]][[1]],'trigram',as.character(i),z[[1]][[2]])
+    write.csv(tfp.df,Z)
+
+    tfpf<-read.csv(Z)
+    tfpff<-freqFreq(tfpf)
+    z<-strsplit(dNOff[I,3],split="trigram")
+    Z<-paste0(z[[1]][[1]],'trigram',as.character(i),z[[1]][[2]])
+    write.csv(tfpff,Z) 
+  
+    h<-head(tfp.df,3);v<-tail(tfp.df,3)
+    print("Trigram Frequencies")
+    print(h);print(v)
+    h<-head(tfpff,3);v<-tail(tfpff,3)
+    print("Trigram Frequecy of Frequencies")
+    print(h);print(v)
+
+
+}
+
+process_qg<- function(qdfm,i) {
+
+    quadgram.frequency <- colSums(qdfm)
+    quadgram.frequency <- sort(quadgram.frequency, decreasing=TRUE)
+    qfp.df<-data.frame(quadgram.frequency)
+    qfp.df["quadgram"] <- rownames(qfp.df)
+    x<-matrix(0,nrow=2,ncol=2)
+    colnames(x)<-c("quadgram.frequency","quadgram")
+    x<-data.frame(x)
+    x[1,]<-c(1,'UK1')
+    x[2,]<-c(1,'UK2')
+    rownames(x)<-c('UK1','UK2')
+    x[,1]<-as.integer(x[,1])
+    qfp.df<-rbind(qfp.df,x)
+
+    nrow(qfp.df)
+    ncol(qfp.df)
+    qrs<-sum(qfp.df$quadgram.frequency)
+    qrs
+    qfp.df["prob"]<- as.numeric(qfp.df[,1])/qrs
+    qfp.df["log(prob)"]<- as.numeric(log(qfp.df[,3]))
+    z<-strsplit(dNOng[I,4],split="quadgram")
+    Z<-paste0(z[[1]][[1]],'quadgram',as.character(i),z[[1]][[2]])
+    write.csv(qfp.df,Z)
+
+    qfpf<-read.csv(Z)
+    qfpff<-freqFreq(qfpf)
+    
+    if(I==1)SPLIT="qgram" else SPLIT="quadgram"
+    
+    z<-strsplit(dNOff[I,4],split=SPLIT)
+    Z<-paste0(z[[1]][[1]],'quadgram',as.character(i),z[[1]][[2]])
+    write.csv(qfpff,Z)
+
+    h<-head(qfp.df,3);v<-tail(qfp.df,3)
+    print("Quadgram Frequencies")
+    print(h);print(v)
+    h<-head(qfpff,3);v<-tail(qfpff,3)
+    print("Quadgram Frequency of Frequencies")
+    print(h);print(v)
+
+}
+
+
+process_pg<- function(qdfm,i) {
+
+    quadgram.frequency <- colSums(qdfm)
+    quadgram.frequency <- sort(quadgram.frequency, decreasing=TRUE)
+    qfp.df<-data.frame(quadgram.frequency)
+    qfp.df["pentagram"] <- rownames(qfp.df)
+    # x<-matrix(0,nrow=2,ncol=2)
+    # colnames(x)<-c("pentagram.frequency","pentagram")
+    # x<-data.frame(x)
+    # x[1,]<-c(1,'UK1')
+    # x[2,]<-c(1,'UK2')
+    # rownames(x)<-c('UK1','UK2')
+    # x[,1]<-as.integer(x[,1])
+    # qfp.df<-rbind(qfp.df,x)
+
+    nrow(qfp.df)
+    ncol(qfp.df)
+    qrs<-sum(qfp.df$quadgram.frequency)
+    qrs
+    qfp.df["prob"]<- as.numeric(qfp.df[,1])/qrs
+    qfp.df["log(prob)"]<- as.numeric(log(qfp.df[,3]))
+    z<-strsplit(dNOng[I,5],split="pentagram")
+    Z<-paste0(z[[1]][[1]],'pentagram',as.character(i),z[[1]][[2]])
+    write.csv(qfp.df,Z)
+
+  
+
+    h<-head(qfp.df,3);v<-tail(qfp.df,3)
+    print("Pentagram Frequencies")
+    print(h);print(v)
+    
+}
+
+```
+
+```{r data partitioning,cache=TRUE}
+
+blog <- iconv(readLines(dNO[1,I], warn = FALSE), "UTF-8", "UTF-8", "byte")
+news <- iconv(readLines(dNO[2,I], warn = FALSE), "UTF-8", "UTF-8", "byte")
+twitter <- iconv(readLines(dNO[3,I], warn = FALSE), "UTF-8", "UTF-8", "byte")
+
+# Magnify the size of the data
+mergedData<-c(blog,news,twitter)
+
+mDS<- round(length(mergedData))
+mergedData<-mergedData[1:mDS]
+object.size(mergedData)
+
+mD<-mergedData
+set.seed(11149)
+FN<-character()
+for(i in 10:1){
+   x<-strsplit(dNO[1,I],split="blogs")
+   f<- paste0(x[[1]][[1]],as.character(i),x[[1]][[2]])
+   FN[i]<-f
+   n <- length(mD)
+   k<-n/i
+   sampleIndexes <- sample(1:round(k), replace = T)
+   b <- mD[sampleIndexes] #training samplle
+   write_output_file(b,f)
+   mD <-mD[-sampleIndexes]  #
+}
+
+FN
+
+```
+```{r unigram dfm-stemming,echo=TRUE,cache=TRUE}
+     
+for(i in 1:10){
+  f<-read_input_file(FN[i])
+  Corp <- corpus(f)  # build the corpus
+  udfm <- dfm(Corp, verbose=FALSE, stem=FALSE,ngrams=1)
+  process_ug(udfm,i)
+
+}
+
+  
+
+
+```
+```{r bigram dfm-stemming,echo=TRUE,cache=TRUE}
+     
+for(i in 1:10){
+  f<-read_input_file(FN[i])
+  Corp <- corpus(f)  # build the corpus
+  bdfm <- dfm(Corp, verbose=FALSE, stem=FALSE,ngrams=2)
+  process_bg(bdfm,i)
+ 
+}
+
+
+```
+
+```{r trigram dfm-stemming,echo=TRUE,cache=TRUE}
+FN   
+for(i in 1:10){
+  
+  f<-read_input_file(FN[i])
+  Corp <- corpus(f)  # build the corpus
+  tdfm <- dfm(Corp,verbose=FALSE, stem=FALSE,ngrams=3)
+  process_tg(tdfm,i)
+ 
+}
+
+
+```
+
+```{r quadgram dfm-stemming,echo=TRUE,cache=TRUE}
+     
+for(i in 1:10){
+  f<-read_input_file(FN[i])
+  Corp <- corpus(f)  # build the corpus
+  qdfm <- dfm(Corp,verbose=FALSE, stem=FALSE,ngrams=4)
+  process_qg(qdfm,i)
+ 
+}
+
+
+```
+
+```{r pentagram dfm-stemming,echo=TRUE,cache=TRUE}
+     
+for(i in 1:10){
+  f<-read_input_file(FN[i])
+  Corp <- corpus(f)  # build the corpus
+  qdfm <- dfm(Corp,verbose=FALSE, stem=FALSE,ngrams=5)
+  process_pg(qdfm,i)
+ 
+}
+
+
+```
